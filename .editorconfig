@@ -1,0 +1,20 @@
+# SPDX-FileCopyrightText: 2022 Noah Fontes
+#
+# SPDX-License-Identifier: Apache-2.0
+
+root = true
+
+[*]
+end_of_line = lf
+charset = utf-8
+
+[*.{json,md,nix,rs,toml}]
+indent_style = space
+trim_trailing_whitespace = true
+insert_final_newline = true
+
+[*.{json,md,nix,toml}]
+indent_size = 2
+
+[*.rs]
+indent_size = 4

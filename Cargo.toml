@@ -1,0 +1,60 @@
+# SPDX-FileCopyrightText: 2022 Noah Fontes
+#
+# SPDX-License-Identifier: Apache-2.0
+
+[package]
+name = "karp"
+version = "0.1.0"
+authors = ["Noah Fontes <noah@noahfontes.com>"]
+description = "Access a KeePass instance on the command line with the KeePassRPC plugin"
+license = "Apache-2.0"
+repository = "https://github.com/impl/karp"
+categories = ["command-line-utilities"]
+keywords = ["cli", "keypass", "password-manager"]
+edition = "2021"
+
+[dependencies]
+Inflector = { version = "0.11.4" }
+aes = { version = "0.8.1" }
+async-recursion = { version = "0.3.2" }
+async-trait = { version = "0.1.56" }
+base64 = { version = "0.13.0" }
+block-padding = { version = "0.3.2", features = ["std"] }
+cbc = { version = "0.1.2", features = ["alloc"] }
+clap = { version = "3.2.6", features = ["derive"] }
+digest = { version = "0.10.3" }
+directories = { version = "4.0.1" }
+env_logger = { version = "0.9.0" }
+futures-util = { version = "0.3.21", features = ["sink", "std"] }
+generic-array = { version = "0.14.5", features = ["serde"] }
+log = { version = "0.4.17" }
+num-bigint = { version = "0.4.3", features = ["rand"] }
+num-traits = { version = "0.2.15" }
+once_cell = { version = "1.12.0" }
+oo7 = { version = "0.1.0-alpha.5", default-features = false, features = ["tokio_runtime"] }
+pinentry = { version = "0.5.0" }
+rand = { version = "0.8.5" }
+rand_chacha = { version = "0.3.1" }
+rpassword = { version = "6.0.1" }
+secrecy = { version = "0.8.0", features = ["serde"] }
+serde = { version = "1.0.137", features = ["derive"] }
+serde_json = { version = "1.0.81" }
+serde_repr = { version = "0.1.8" }
+serde_with = {version = "1.14.0", features = ["base64"] }
+sha-1 = { version = "0.10.0" }
+sha2 = { version = "0.10.2" }
+subtle = { version = "2.4.1" }
+tabled = { version = "0.7.0" }
+thiserror = { version = "1.0.31" }
+tokio = { version = "1.19.2", features = ["macros", "net", "rt-multi-thread", "sync"] }
+tokio-stream = { version = "0.1.9" }
+tokio-tungstenite = { version = "0.17.1" }
+url = { version = "2.2.2" }
+uuid = { version = "1.1.2", features = ["macro-diagnostics", "serde"] }
+
+[dev-dependencies]
+serde_test = { version = "1.0.137" }
+
+[patch.crates-io]
+tabled = { git = "https://github.com/zhiburt/tabled" }
+tungstenite = { git = "https://github.com/snapview/tungstenite-rs" }
