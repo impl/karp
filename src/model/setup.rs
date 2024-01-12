@@ -16,6 +16,7 @@ use super::{hash::Hash, key_material::KeyMaterial};
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub(crate) enum ErrorCode {
     AuthFailed,
+    AuthExpired,
     #[serde(other)]
     Other,
 }
@@ -24,13 +25,21 @@ pub(crate) enum ErrorCode {
 #[serde(rename_all = "camelCase")]
 pub(crate) struct Error {
     code: ErrorCode,
-    message_params: Vec<String>,
+    message_params: Option<Vec<String>>,
 }
 
 impl Error {
     #[cfg(any())]
     pub(crate) fn code(&self) -> ErrorCode {
         self.code
+    }
+
+    pub(crate) fn is_auth_error(&self) -> bool {
+        match self.code {
+            ErrorCode::AuthFailed => true,
+            ErrorCode::AuthExpired => true,
+            _ => false,
+        }
     }
 }
 
@@ -43,7 +52,7 @@ impl PartialEq<ErrorCode> for Error {
 impl Display for Error {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:?}", self.code)?;
-        for param in &self.message_params {
+        for param in self.message_params.iter().flatten() {
             write!(f, ": {}", param)?;
         }
         Ok(())

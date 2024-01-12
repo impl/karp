@@ -333,7 +333,7 @@ async fn key_init<
         .ok_or(error::Api::StreamEnded)??;
     match msg.as_setup().map(model::setup::Setup::variant) {
         Some(&model::setup::Variant::Error { ref error })
-            if error == &model::setup::ErrorCode::AuthFailed =>
+            if error.is_auth_error() =>
         {
             warn!(
                 "Authentication failed, so we have to start over with SRP: {}",
