@@ -1,12 +1,12 @@
-// SPDX-FileCopyrightText: 2022 Noah Fontes
+// SPDX-FileCopyrightText: 2022-2024 Noah Fontes
 //
 // SPDX-License-Identifier: Apache-2.0
 
 mod encrypted_json;
-pub(crate) mod hash;
-pub(crate) mod jsonrpc;
-pub(crate) mod key_material;
-pub(crate) mod setup;
+pub(super) mod hash;
+pub(super) mod jsonrpc;
+pub(super) mod key_material;
+pub(super) mod setup;
 
 use serde::{Deserialize, Serialize};
 
@@ -23,7 +23,7 @@ pub(crate) enum Message {
 }
 
 impl Message {
-    pub(crate) fn new_from_jsonrpc(
+    pub(super) fn new_from_jsonrpc(
         session_key: &hash::Secret,
         jsonrpc: &jsonrpc::Jsonrpc,
     ) -> Result<Self> {
@@ -32,14 +32,14 @@ impl Message {
         })
     }
 
-    pub(crate) const fn as_setup(&self) -> Option<&setup::Setup> {
+    pub(super) const fn as_setup(&self) -> Option<&setup::Setup> {
         match *self {
             Message::Setup(ref setup) => Some(setup),
             Message::Jsonrpc { .. } => None,
         }
     }
 
-    pub(crate) fn as_jsonrpc(
+    pub(super) fn as_jsonrpc(
         &self,
         session_key: &hash::Secret,
     ) -> Option<Result<jsonrpc::Jsonrpc>> {

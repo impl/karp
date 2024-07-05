@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2022 Noah Fontes
+// SPDX-FileCopyrightText: 2022-2024 Noah Fontes
 //
 // SPDX-License-Identifier: Apache-2.0
 
@@ -18,7 +18,7 @@ const HASH_BYTES: usize = 32;
 /// plugin. May or may not also represent secret data.
 #[derive(Debug, Default, Deserialize, Serialize, Clone, Eq)]
 #[serde(try_from = "String", into = "String")]
-pub(crate) struct Hash([u8; HASH_BYTES]);
+pub(in crate::keepass) struct Hash([u8; HASH_BYTES]);
 
 impl From<GenericArray<u8, U32>> for Hash {
     fn from(mut value: GenericArray<u8, U32>) -> Self {
@@ -101,7 +101,7 @@ impl secrecy::Zeroize for Hash {
 }
 
 #[derive(Deserialize, Serialize, Clone)]
-pub(crate) struct Secret(secrecy::Secret<Hash>);
+pub(in crate::keepass) struct Secret(secrecy::Secret<Hash>);
 
 impl From<&Secret> for secrecy::Secret<[u8; HASH_BYTES]> {
     fn from(value: &Secret) -> Self {

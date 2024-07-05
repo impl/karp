@@ -1,33 +1,33 @@
-// SPDX-FileCopyrightText: 2022 Noah Fontes
+// SPDX-FileCopyrightText: 2022-2024 Noah Fontes
 //
 // SPDX-License-Identifier: Apache-2.0
 
 use async_trait::async_trait;
 use clap::Parser;
-use futures_util::stream;
 use log::error;
 use secrecy::ExposeSecret;
-use tabled::{object::Cell, Format, Modify, Style, Table};
-use tokio::sync::mpsc;
+use tabled::{
+    settings::{object::Cell, Format, Modify, Style},
+    Table,
+};
 
 use crate::{
-    api,
+    client::{Client, FormFieldType},
     error::{self, Result},
-    manager,
 };
 
 /// Get the form fields of an entry at a given path.
 #[derive(Debug, Parser)]
-#[clap(allow_missing_positional = true)]
+#[command(allow_missing_positional = true)]
 pub(crate) struct Command {
     /// Filter the form fields returned to those matching a particular type.
-    #[clap(long, short, arg_enum, value_parser)]
-    type_: Option<api::FormFieldType>,
+    #[arg(long, short, value_enum)]
+    type_: Option<FormFieldType>,
 
     /// The numerical index of a particular field to select. Indexing is
     /// performed after any filtering is applied. When this option is selected,
     /// only the field's value is printed.
-    #[clap(long, short)]
+    #[arg(long, short)]
     index: Option<usize>,
 
     /// The location of the entry to look up within the group hierarchy.
@@ -41,39 +41,34 @@ pub(crate) struct Command {
 
 #[async_trait]
 impl super::Command for Command {
-    async fn execute(self, tx: mpsc::Sender<manager::JsonrpcCall>) -> Result<()> {
-        let entry =
-            api::get_entry_in_group_hierarchy(tx, stream::iter(self.groups), &self.entry).await?;
+    async fn execute(self, client: impl Client + Send) -> Result<()> {
+        let entry = client
+            .get_entry(&mut self.groups.iter().map(String::as_ref), &self.entry)
+            .await?;
 
-        let mut fields_iter = entry
-            .form_field_list
-            .as_ref()
-            .map_or_else(|| [].iter(), IntoIterator::into_iter)
-            .filter(|field| {
-                self.type_
-                    .map_or(true, |field_type| field.type_ == field_type)
-            });
+        let mut fields_iter = entry.form_fields.into_iter().filter(|field| {
+            self.type_
+                .map_or(true, |field_type| field.type_ == field_type)
+        });
 
-        match self.index {
-            Some(n) => match fields_iter.nth(n) {
-                Some(field) => {
-                    println!("{}", field.value.expose_secret());
-                    Ok(())
-                }
-                None => {
-                    error!("No form field with index {}", n);
-                    Err(error::Error::Command)
-                }
-            },
-            None => {
-                println!(
-                    "{}",
-                    Table::new((0_u32..).zip(fields_iter))
-                        .with(Style::rounded())
-                        .with(Modify::new(Cell(0, 0)).with(Format::new(|_| "Index".to_owned())))
-                );
+        if let Some(n) = self.index {
+            if let Some(field) = fields_iter.nth(n) {
+                println!("{}", field.value.expose_secret());
                 Ok(())
+            } else {
+                error!("No form field with index {}", n);
+                Err(error::Error::Command)
             }
+        } else {
+            println!(
+                "{}",
+                Table::new((0_u32..).zip(fields_iter))
+                    .with(Style::rounded())
+                    .with(
+                        Modify::new(Cell::new(0, 0)).with(Format::content(|_| "Index".to_owned()))
+                    )
+            );
+            Ok(())
         }
     }
 }

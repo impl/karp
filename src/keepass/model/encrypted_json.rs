@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2022 Noah Fontes
+// SPDX-FileCopyrightText: 2022-2024 Noah Fontes
 //
 // SPDX-License-Identifier: Apache-2.0
 
@@ -14,6 +14,7 @@ use subtle::ConstantTimeEq;
 
 use crate::{
     error::{self, Result},
+    keepass::error as keepass_error,
     rng,
 };
 
@@ -25,7 +26,7 @@ where
     PayloadT: AsRef<[u8]>,
     IvT: AsRef<[u8]>,
 {
-    Sha1::new_with_prefix(sha1::Sha1::digest(key))
+    Sha1::new_with_prefix(Sha1::digest(key))
         .chain_update(payload)
         .chain_update(iv)
         .finalize()
@@ -64,13 +65,13 @@ impl<T> EncryptedJson<T> {
         let message = encryptor
             .encrypt_padded_vec_mut::<block_padding::Pkcs7>(plaintext.expose_secret().as_bytes());
 
-        let mac = compute_mac(key.expose_secret(), &message, &iv);
+        let mac = compute_mac(key.expose_secret(), &message, iv);
 
         Ok(Self {
             message,
             iv: iv.into(),
             hmac: mac,
-            _marker: PhantomData::default(),
+            _marker: PhantomData,
         })
     }
 
@@ -80,9 +81,9 @@ impl<T> EncryptedJson<T> {
     {
         let key: Secret<[u8; 32]> = session_key.into();
 
-        let mac = compute_mac(key.expose_secret(), &self.message, &self.iv);
+        let mac = compute_mac(key.expose_secret(), &self.message, self.iv);
         if mac.ct_eq(&self.hmac).unwrap_u8() != 1 {
-            return Err(error::Api::MessageAuthenticationFailure.into());
+            return Err(keepass_error::Api::MessageAuthenticationFailure.into());
         }
 
         let decryptor = cbc::Decryptor::<aes::Aes256>::new(
@@ -95,7 +96,7 @@ impl<T> EncryptedJson<T> {
                 .map_err(error::Conversion::from)?,
         );
 
-        Ok(serde_json::from_slice::<T>(plaintext.expose_secret())?)
+        Ok(serde_json::from_slice(plaintext.expose_secret())?)
     }
 }
 

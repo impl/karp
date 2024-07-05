@@ -1,12 +1,12 @@
-# SPDX-FileCopyrightText: 2022 Noah Fontes
+# SPDX-FileCopyrightText: 2022-2024 Noah Fontes
 #
 # SPDX-License-Identifier: Apache-2.0
 
 [package]
 name = "karp"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Noah Fontes <noah@noahfontes.com>"]
-description = "Access a KeePass instance on the command line with the KeePassRPC plugin"
+description = "Access KeePass or KeePassXC on the command line"
 license = "Apache-2.0"
 repository = "https://github.com/impl/karp"
 categories = ["command-line-utilities"]
@@ -21,40 +21,46 @@ async-trait = { version = "0.1.56" }
 base64 = { version = "0.13.0" }
 block-padding = { version = "0.3.2", features = ["std"] }
 cbc = { version = "0.1.2", features = ["alloc"] }
-clap = { version = "3.2.6", features = ["derive"] }
+clap = { version = "4.5.8", features = ["derive", "wrap_help"] }
+crypto-bigint = { version = "0.5.5" }
+crypto_box = { version = "0.9.1", features = ["alloc", "serde", "std"] }
 digest = { version = "0.10.3" }
 directories = { version = "4.0.1" }
 env_logger = { version = "0.9.0" }
-futures-util = { version = "0.3.21", features = ["sink", "std"] }
+futures-util = { version = "0.3.30", features = ["sink", "std"] }
 generic-array = { version = "0.14.5", features = ["serde"] }
 log = { version = "0.4.17" }
 num-bigint = { version = "0.4.3", features = ["rand"] }
 num-traits = { version = "0.2.15" }
+oo7 = { version = "0.1.0-alpha.5", default-features = false, features = ["tokio_runtime"], optional = true }
 once_cell = { version = "1.12.0" }
-oo7 = { version = "0.1.0-alpha.5", default-features = false, features = ["tokio_runtime"] }
 pinentry = { version = "0.5.0" }
 rand = { version = "0.8.5" }
 rand_chacha = { version = "0.3.1" }
+rand_core = { version = "0.6.4" }
 rpassword = { version = "6.0.1" }
 secrecy = { version = "0.8.0", features = ["serde"] }
+security-framework = { version = "2.11.0", optional = true }
 serde = { version = "1.0.137", features = ["derive"] }
 serde_json = { version = "1.0.81" }
 serde_repr = { version = "0.1.8" }
-serde_with = {version = "1.14.0", features = ["base64"] }
+serde_with = { version = "1.14.0", features = ["base64", "json"] }
+serdect = { version = "~0.2.0", features = ["alloc"] }
 sha-1 = { version = "0.10.0" }
 sha2 = { version = "0.10.2" }
 subtle = { version = "2.4.1" }
-tabled = { version = "0.7.0" }
+tabled = { version = "0.15.0" }
 thiserror = { version = "1.0.31" }
 tokio = { version = "1.19.2", features = ["macros", "net", "rt-multi-thread", "sync"] }
 tokio-stream = { version = "0.1.9" }
 tokio-tungstenite = { version = "0.17.1" }
+tokio-util = { version = "0.7.11", features = ["codec"] }
 url = { version = "2.2.2" }
 uuid = { version = "1.1.2", features = ["macro-diagnostics", "serde"] }
 
+[features]
+secret-service = ["oo7"]
+keychain = ["security-framework"]
+
 [dev-dependencies]
 serde_test = { version = "1.0.137" }
-
-[patch.crates-io]
-tabled = { git = "https://github.com/zhiburt/tabled" }
-tungstenite = { git = "https://github.com/snapview/tungstenite-rs" }

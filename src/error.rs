@@ -1,13 +1,15 @@
-// SPDX-FileCopyrightText: 2022 Noah Fontes
+// SPDX-FileCopyrightText: 2022-2024 Noah Fontes
 //
 // SPDX-License-Identifier: Apache-2.0
 
 use std::{convert::Infallible, io, result};
 
 use thiserror::Error;
-use tokio::sync::{mpsc, oneshot};
+use tokio::sync::{mpsc, oneshot, watch};
 
-use crate::{api, model};
+use crate::client;
+use crate::keepass::error as keepass_error;
+use crate::keepassxc::error as keepassxc_error;
 
 pub(crate) type Result<T, E = Error> = result::Result<T, E>;
 
@@ -15,22 +17,18 @@ pub(crate) type Result<T, E = Error> = result::Result<T, E>;
 pub(crate) enum Error {
     #[error("IO operation failed: {0}")]
     Io(#[from] io::Error),
-    #[error("WebSocket error: {0}")]
-    Websocket(tokio_tungstenite::tungstenite::Error),
     #[error("JSON format error: {0}")]
     Json(serde_json::Error),
     #[error("data conversion error: {0}")]
     Conversion(#[from] Conversion),
-    #[error("SRP negotiation error: {0}")]
-    Srp(#[from] Srp),
-    #[error("challenge-response authentication error: {0}")]
-    ChallengeResponse(#[from] ChallengeResponse),
-    #[error("API error: {0}")]
-    Api(#[from] Api),
     #[error("storage error: {0}")]
     Storage(#[from] Storage),
     #[error("password retrieval error: {0}")]
     Password(#[from] Password),
+    #[error("KeePassRPC error: {0}")]
+    Keepassrpc(keepass_error::Error),
+    #[error("KeePassXC error: {0}")]
+    Keepassxc(#[from] keepassxc_error::Error),
     #[error("internal communication error: {0}")]
     Internal(#[from] Internal),
     #[error("command execution failed")]
@@ -38,30 +36,30 @@ pub(crate) enum Error {
     #[error("operation cancelled")]
     Cancelled,
     #[error(r#"group "{}" does not have a child group named "{}""#, .parent.path.escape_default(), .name.escape_default())]
-    GroupNotFound {
-        parent: Box<api::Group>,
-        name: String,
-    },
+    GroupNotFound { parent: client::Group, name: String },
     #[error(r#"group "{}" does not have an entry named "{}""#, .parent.path.escape_default(), .name.escape_default())]
-    EntryNotFound {
-        parent: Box<api::Group>,
-        name: String,
-    },
+    EntryNotFound { parent: client::Group, name: String },
+}
+
+impl From<keepass_error::Error> for Error {
+    fn from(value: keepass_error::Error) -> Self {
+        match value {
+            keepass_error::Error::Io(e) => Self::Io(e),
+            err @ (keepass_error::Error::Websocket(_)
+            | keepass_error::Error::Api(_)
+            | keepass_error::Error::Srp(_)
+            | keepass_error::Error::ChallengeResponse(_)) => Self::Keepassrpc(err),
+        }
+    }
 }
 
 impl From<pinentry::Error> for Error {
     fn from(value: pinentry::Error) -> Self {
-        // LINT: Deliberate fall-through that should catch future cases added to
-        // the enum.
-        #[allow(
-            clippy::wildcard_enum_match_arm,
-            clippy::match_wildcard_for_single_variants
-        )]
         match value {
             pinentry::Error::Cancelled | pinentry::Error::Timeout => Self::Cancelled,
             pinentry::Error::Io(e) => Self::Io(e),
             pinentry::Error::Encoding(e) => Self::Conversion(Conversion::Encoding(e)),
-            _ => Self::Password(Password::Pinentry(value)),
+            err @ pinentry::Error::Gpg(_) => Self::Password(Password::Pinentry(err)),
         }
     }
 }
@@ -81,18 +79,6 @@ impl From<serde_json::Error> for Error {
 impl From<tokio::task::JoinError> for Error {
     fn from(value: tokio::task::JoinError) -> Self {
         Self::Io(value.into())
-    }
-}
-
-impl From<tokio_tungstenite::tungstenite::Error> for Error {
-    fn from(value: tokio_tungstenite::tungstenite::Error) -> Self {
-        // LINT: Deliberate fall-through that should catch future cases added to
-        // the enum.
-        #[allow(clippy::wildcard_enum_match_arm)]
-        match value {
-            tokio_tungstenite::tungstenite::Error::Io(e) => Self::Io(e),
-            _ => Self::Websocket(value),
-        }
     }
 }
 
@@ -119,39 +105,18 @@ pub(crate) enum Conversion {
 }
 
 #[derive(Error, Debug)]
-pub(crate) enum Srp {
-    #[error("server proof did not match expected value")]
-    ServerProofMismatch,
-}
-
-#[derive(Error, Debug)]
-pub(crate) enum ChallengeResponse {
-    #[error("client response did not match expected value: {0}")]
-    ClientResponseMismatch(model::setup::Error),
-    #[error("server response did not match expected value")]
-    ServerResponseMismatch,
-}
-
-#[derive(Error, Debug)]
-pub(crate) enum Api {
-    #[error("server stream terminated during processing")]
-    StreamEnded,
-    #[error("server sent a message that we did not expect to receive: {0:?}")]
-    UnhandledMessage(model::Message),
-    #[error("server error: {}: {}", .0.name(), .0.message())]
-    ServerError(model::jsonrpc::Error),
-    #[error("server security level is too low for us to accept and continue processing (wanted at least {0:?}, but got {1:?})")]
-    SecurityLevelTooLow(model::setup::SecurityLevel, model::setup::SecurityLevel),
-    #[error("encrypted message could not be authenticated")]
-    MessageAuthenticationFailure,
-}
-
-#[derive(Error, Debug)]
 pub(crate) enum Storage {
     #[error("client identifier in storage differs from identifier bound to stream (are you running multiple instances at the same time?)")]
     Conflict,
+    #[cfg(feature = "keychain")]
+    #[error("no OS-specific filesystem configuration found")]
+    NoProjectDirs,
+    #[cfg(feature = "secret-service")]
     #[error("secret service error: {0}")]
     SecretService(#[from] oo7::Error),
+    #[cfg(feature = "keychain")]
+    #[error("Security framework error: {0}")]
+    SecurityFramework(#[from] security_framework::base::Error),
 }
 
 #[derive(Error, Debug)]
@@ -170,6 +135,18 @@ pub(crate) enum Internal {
 
 impl<T> From<mpsc::error::SendError<T>> for Internal {
     fn from(_: mpsc::error::SendError<T>) -> Self {
+        Self::ChannelClosed
+    }
+}
+
+impl<T> From<watch::error::SendError<T>> for Internal {
+    fn from(_: watch::error::SendError<T>) -> Self {
+        Self::ChannelClosed
+    }
+}
+
+impl From<watch::error::RecvError> for Internal {
+    fn from(_: watch::error::RecvError) -> Self {
         Self::ChannelClosed
     }
 }

@@ -1,43 +1,28 @@
-// SPDX-FileCopyrightText: 2022 Noah Fontes
+// SPDX-FileCopyrightText: 2022-2024 Noah Fontes
 //
 // SPDX-License-Identifier: Apache-2.0
 
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use async_recursion::async_recursion;
 use async_trait::async_trait;
-use futures_util::{stream, SinkExt, Stream, StreamExt};
+use futures_util::{lock::Mutex, stream, SinkExt, Stream, StreamExt};
 use log::warn;
 use num_bigint::RandBigInt;
 use secrecy::{ExposeSecret, SecretString};
 use sha2::{Digest, Sha256};
 use subtle::ConstantTimeEq;
-use tokio::{select, sync::oneshot};
+use tokio::select;
 use uuid::Uuid;
 
 use crate::{
     error::{self, Result},
-    message, model, password, rng, session, srp,
+    password, rng,
     storage::{self, IsPersistent, Storage},
 };
 
-#[derive(Debug)]
-pub(crate) struct JsonrpcCall {
-    req: model::jsonrpc::Jsonrpc,
-    tx: oneshot::Sender<Result<model::jsonrpc::Response>>,
-}
-
-impl JsonrpcCall {
-    pub(crate) fn new<T: Into<model::jsonrpc::Request>>(
-        req: T,
-        tx: oneshot::Sender<Result<model::jsonrpc::Response>>,
-    ) -> Self {
-        Self {
-            req: model::jsonrpc::Jsonrpc::Request(req.into()),
-            tx,
-        }
-    }
-}
+use super::{api::Call, error as keepass_error, message, model, session, srp};
 
 /// An implementation of the storage trait that asserts any returned data has
 /// the expected identifier.
@@ -61,6 +46,14 @@ impl<T: Storage<session::Data>> BoundStorage<'_, T> {
 impl<T: IsPersistent> IsPersistent for BoundStorage<'_, T> {
     fn is_persistent(&self) -> bool {
         self.delegate.is_persistent()
+    }
+}
+
+fn storage_security_level<T>(storage: &dyn Storage<T>) -> model::setup::SecurityLevel {
+    if storage.is_persistent() {
+        model::setup::SecurityLevel::Medium
+    } else {
+        model::setup::SecurityLevel::High
     }
 }
 
@@ -117,7 +110,10 @@ async fn srp_computed<
     message_stream
         .send(model::Message::Setup(model::setup::Setup::new(
             model::setup::Variant::SrpProofToServer {
-                srp: model::setup::SrpProofToServer::new(&negotiate, storage.security_level()),
+                srp: model::setup::SrpProofToServer::new(
+                    &negotiate,
+                    storage_security_level(storage),
+                ),
             },
         )))
         .await?;
@@ -125,9 +121,9 @@ async fn srp_computed<
     let msg = message_stream
         .next()
         .await
-        .ok_or(error::Api::StreamEnded)??;
+        .ok_or(keepass_error::Api::StreamEnded)??;
     match msg.as_setup().map(model::setup::Setup::variant) {
-        Some(&model::setup::Variant::Error { ref error })
+        Some(model::setup::Variant::Error { error })
             if error == &model::setup::ErrorCode::AuthFailed =>
         {
             warn!("Authentication failed, so you need to try again: {}", error);
@@ -142,15 +138,16 @@ async fn srp_computed<
             )
             .await
         }
-        Some(&model::setup::Variant::SrpProofToClient { ref srp, .. })
-            if srp.security_level() < storage.security_level() =>
+        Some(model::setup::Variant::SrpProofToClient { srp, .. })
+            if srp.security_level() < storage_security_level(storage) =>
         {
-            Err(
-                error::Api::SecurityLevelTooLow(storage.security_level(), srp.security_level())
-                    .into(),
+            Err(keepass_error::Api::SecurityLevelTooLow(
+                storage_security_level(storage),
+                srp.security_level(),
             )
+            .into())
         }
-        Some(&model::setup::Variant::SrpProofToClient { ref srp, .. }) => {
+        Some(model::setup::Variant::SrpProofToClient { srp, .. }) => {
             let authenticated = negotiate.authenticate(srp.evidence())?;
 
             storage
@@ -165,23 +162,23 @@ async fn srp_computed<
                 identifier: authenticated.identifier(),
             })
         }
-        _ => Err(error::Api::UnhandledMessage(msg).into()),
+        _ => Err(keepass_error::Api::UnhandledMessage(msg).into()),
     }
 }
 
 #[async_recursion]
-async fn srp_init<
-    'storage,
-    Storage: storage::Storage<session::Data>,
-    Prompt: password::Prompt,
-    MessageStream: message::Stream,
->(
+async fn srp_init<'storage, Storage, Prompt, MessageStream>(
     storage: &'storage mut Storage,
     prompt: &Prompt,
     prompt_error: Option<String>,
     message_stream: &mut MessageStream,
     negotiate: srp::Protocol<srp::Init>,
-) -> Result<BoundStorage<'storage, Storage>> {
+) -> Result<BoundStorage<'storage, Storage>>
+where
+    Storage: storage::Storage<session::Data>,
+    Prompt: password::Prompt,
+    MessageStream: message::Stream,
+{
     // Write identifier and clear any potential session key since we're
     // starting the initialization over.
     let session_data = session::Data::new_unauthenticated(negotiate.identifier());
@@ -192,7 +189,7 @@ async fn srp_init<
             model::setup::Variant::ClientInit(model::setup::ClientInit::new(
                 model::setup::ClientInitVariant::Srp(model::setup::SrpIdentifyToServer::new(
                     &negotiate,
-                    storage.security_level(),
+                    storage_security_level(storage),
                 )),
             )),
         )))
@@ -201,17 +198,18 @@ async fn srp_init<
     let msg = message_stream
         .next()
         .await
-        .ok_or(error::Api::StreamEnded)??;
+        .ok_or(keepass_error::Api::StreamEnded)??;
     match msg.as_setup().map(model::setup::Setup::variant) {
-        Some(&model::setup::Variant::SrpIdentifyToClient { ref srp, .. })
-            if srp.security_level() < storage.security_level() =>
+        Some(model::setup::Variant::SrpIdentifyToClient { srp, .. })
+            if srp.security_level() < storage_security_level(storage) =>
         {
-            Err(
-                error::Api::SecurityLevelTooLow(storage.security_level(), srp.security_level())
-                    .into(),
+            Err(keepass_error::Api::SecurityLevelTooLow(
+                storage_security_level(storage),
+                srp.security_level(),
             )
+            .into())
         }
-        Some(&model::setup::Variant::SrpIdentifyToClient { ref srp, .. }) => {
+        Some(model::setup::Variant::SrpIdentifyToClient { srp, .. }) => {
             // Get matching password from user.
             let mut req = password::RequestBuilder::new();
             if let Some(error) = prompt_error {
@@ -231,7 +229,7 @@ async fn srp_init<
             )
             .await
         }
-        _ => Err(error::Api::UnhandledMessage(msg).into()),
+        _ => Err(keepass_error::Api::UnhandledMessage(msg).into()),
     }
 }
 
@@ -268,22 +266,23 @@ async fn key_negotiate<
     let msg = message_stream
         .next()
         .await
-        .ok_or(error::Api::StreamEnded)??;
+        .ok_or(keepass_error::Api::StreamEnded)??;
     match msg.as_setup().map(model::setup::Setup::variant) {
-        Some(&model::setup::Variant::Error { ref error })
+        Some(model::setup::Variant::Error { error })
             if error == &model::setup::ErrorCode::AuthFailed =>
         {
-            Err(error::ChallengeResponse::ClientResponseMismatch(error.clone()).into())
+            Err(keepass_error::ChallengeResponse::ClientResponseMismatch(error.clone()).into())
         }
-        Some(&model::setup::Variant::KeyServerResponse { ref key, .. })
-            if key.security_level() < storage.security_level() =>
+        Some(model::setup::Variant::KeyServerResponse { key, .. })
+            if key.security_level() < storage_security_level(&storage) =>
         {
-            Err(
-                error::Api::SecurityLevelTooLow(storage.security_level(), key.security_level())
-                    .into(),
+            Err(keepass_error::Api::SecurityLevelTooLow(
+                storage_security_level(&storage),
+                key.security_level(),
             )
+            .into())
         }
-        Some(&model::setup::Variant::KeyServerResponse { ref key }) => {
+        Some(model::setup::Variant::KeyServerResponse { key }) => {
             let their_response = Sha256::new_with_prefix("0")
                 .chain_update({
                     storage
@@ -296,12 +295,12 @@ async fn key_negotiate<
                 .chain_update(&my_challenge)
                 .into();
             if key.server_response() != &their_response {
-                return Err(error::ChallengeResponse::ServerResponseMismatch.into());
+                return Err(keepass_error::ChallengeResponse::ServerResponseMismatch.into());
             }
 
             Ok(storage)
         }
-        _ => Err(error::Api::UnhandledMessage(msg).into()),
+        _ => Err(keepass_error::Api::UnhandledMessage(msg).into()),
     }
 }
 
@@ -330,26 +329,25 @@ async fn key_init<
     let msg = message_stream
         .next()
         .await
-        .ok_or(error::Api::StreamEnded)??;
+        .ok_or(keepass_error::Api::StreamEnded)??;
     match msg.as_setup().map(model::setup::Setup::variant) {
-        Some(&model::setup::Variant::Error { ref error })
-            if error.is_auth_error() =>
-        {
+        Some(model::setup::Variant::Error { error }) if error.is_auth_error() => {
             warn!(
                 "Authentication failed, so we have to start over with SRP: {}",
                 error
             );
             srp_init(storage, prompt, None, message_stream, srp::Protocol::new()).await
         }
-        Some(&model::setup::Variant::KeyServerChallenge { ref key, .. })
-            if key.security_level() < storage.security_level() =>
+        Some(model::setup::Variant::KeyServerChallenge { key, .. })
+            if key.security_level() < storage_security_level(storage) =>
         {
-            Err(
-                error::Api::SecurityLevelTooLow(storage.security_level(), key.security_level())
-                    .into(),
+            Err(keepass_error::Api::SecurityLevelTooLow(
+                storage_security_level(storage),
+                key.security_level(),
             )
+            .into())
         }
-        Some(&model::setup::Variant::KeyServerChallenge { ref key, .. }) => {
+        Some(model::setup::Variant::KeyServerChallenge { key, .. }) => {
             key_negotiate(
                 BoundStorage {
                     delegate: storage,
@@ -360,7 +358,7 @@ async fn key_init<
             )
             .await
         }
-        _ => Err(error::Api::UnhandledMessage(msg).into()),
+        _ => Err(keepass_error::Api::UnhandledMessage(msg).into()),
     }
 }
 
@@ -405,29 +403,31 @@ async fn authenticate<
     }
 }
 
-pub(crate) async fn run<
+pub(super) async fn run<
     Storage: storage::Storage<session::Data>,
     Prompt: password::Prompt,
     MessageStream: message::Stream,
-    CallStream: Stream<Item = JsonrpcCall> + Send + Unpin,
+    CallStream: Stream<Item = Call> + Send + Unpin,
 >(
-    storage: &mut Storage,
-    prompt: &Prompt,
-    message_stream: &mut MessageStream,
-    call_stream: &mut CallStream,
+    storage: Arc<Mutex<Storage>>,
+    prompt: Arc<Prompt>,
+    mut message_stream: MessageStream,
+    mut call_stream: CallStream,
 ) -> Result<()> {
-    let mut pending_call: Option<JsonrpcCall> = None;
+    let mut pending_call: Option<Call> = None;
 
     'reauthenticate: loop {
-        let mut bound_storage = authenticate(storage, prompt, message_stream).await?;
+        let mut locked_storage = storage.lock().await;
+        let mut bound_storage =
+            authenticate(&mut *locked_storage, prompt.as_ref(), &mut message_stream).await?;
 
-        let mut backfilled_call_stream = stream::iter(pending_call.take()).chain(&mut *call_stream);
-        let mut calls: HashMap<model::jsonrpc::Id, JsonrpcCall> = HashMap::new();
+        let mut backfilled_call_stream = stream::iter(pending_call.take()).chain(&mut call_stream);
+        let mut calls: HashMap<model::jsonrpc::Id, Call> = HashMap::new();
 
         loop {
             select! {
                 candidate = message_stream.next() => {
-                    let msg = candidate.ok_or(error::Api::StreamEnded)??;
+                    let msg = candidate.ok_or(keepass_error::Api::StreamEnded)??;
                     let dec = bound_storage
                         .map_session_key(|session_key| msg.as_jsonrpc(session_key))
                         .await
@@ -441,7 +441,7 @@ pub(crate) async fn run<
                                 }
                             }
                         }
-                        Some(None) => return Err(error::Api::StreamEnded.into()),
+                        Some(None) => return Err(keepass_error::Api::StreamEnded.into()),
                         None => {
                             // We will have no way to decrypt this message, so
                             // we have to drop it, as well as any other
@@ -451,7 +451,7 @@ pub(crate) async fn run<
                             }
                             continue 'reauthenticate;
                         }
-                        _ => return Err(error::Api::UnhandledMessage(msg).into()),
+                        _ => return Err(keepass_error::Api::UnhandledMessage(msg).into()),
                     };
                 },
                 candidate = backfilled_call_stream.next() => {
@@ -465,19 +465,16 @@ pub(crate) async fn run<
                                 .unwrap_or(None)
                                 .transpose()?;
 
-                            match enc {
-                                Some(msg) => {
-                                    message_stream.send(msg).await?;
-                                    if let model::jsonrpc::Jsonrpc::Request(ref req) = call.req {
-                                        if let Some(id) = req.id().as_ref() {
-                                            assert!(calls.insert(id.clone(), call).is_none());
-                                        }
-                                    };
-                                }
-                                None => {
-                                    pending_call = Some(call);
-                                    continue 'reauthenticate;
-                                }
+                            if let Some(msg) = enc {
+                                message_stream.send(msg).await?;
+                                if let model::jsonrpc::Jsonrpc::Request(ref req) = call.req {
+                                    if let Some(id) = req.id().as_ref() {
+                                        assert!(calls.insert(id.clone(), call).is_none());
+                                    }
+                                };
+                            } else {
+                                pending_call = Some(call);
+                                continue 'reauthenticate;
                             };
                         }
                         None => {

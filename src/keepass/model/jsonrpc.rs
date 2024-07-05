@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2022 Noah Fontes
+// SPDX-FileCopyrightText: 2022-2024 Noah Fontes
 //
 // SPDX-License-Identifier: Apache-2.0
 
@@ -9,7 +9,7 @@ use crate::rng;
 
 #[derive(Debug, Deserialize, Clone, Serialize, PartialEq, Eq, Hash)]
 #[serde(untagged)]
-pub(crate) enum Id {
+pub(in crate::keepass) enum Id {
     String(String),
     Number(serde_json::Number),
 }
@@ -22,7 +22,7 @@ pub(crate) struct Request {
 }
 
 impl Request {
-    pub(crate) fn new<P>(method: &str, params: P) -> Self
+    pub(in crate::keepass) fn new<P>(method: &str, params: P) -> Self
     where
         P: AsRef<[serde_json::Value]>,
     {
@@ -37,7 +37,7 @@ impl Request {
         })
     }
 
-    pub(crate) const fn id(&self) -> &Option<Id> {
+    pub(in crate::keepass) const fn id(&self) -> &Option<Id> {
         &self.id
     }
 }
@@ -50,18 +50,18 @@ pub(crate) struct Error {
 }
 
 impl Error {
-    pub(crate) fn name(&self) -> &str {
+    pub(in crate::keepass) fn name(&self) -> &str {
         &self.name
     }
 
-    pub(crate) fn message(&self) -> &str {
+    pub(in crate::keepass) fn message(&self) -> &str {
         &self.message
     }
 }
 
 #[derive(Debug, Deserialize, Clone, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
-pub(crate) enum ResponseVariant {
+pub(in crate::keepass) enum ResponseVariant {
     Result(serde_json::Value),
     Error(Error),
 }
@@ -74,11 +74,11 @@ pub(crate) struct Response {
 }
 
 impl Response {
-    pub(crate) const fn id(&self) -> &Id {
+    pub(in crate::keepass) const fn id(&self) -> &Id {
         &self.id
     }
 
-    pub(crate) const fn variant(&self) -> &ResponseVariant {
+    pub(in crate::keepass) const fn variant(&self) -> &ResponseVariant {
         &self.variant
     }
 }

@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2022 Noah Fontes
+// SPDX-FileCopyrightText: 2022-2024 Noah Fontes
 //
 // SPDX-License-Identifier: Apache-2.0
 
@@ -6,16 +6,15 @@ use digest::Digest;
 use num_bigint::{BigInt, Sign};
 use num_traits::Zero;
 use once_cell::sync::Lazy;
-use rand::{Rng, RngCore};
+use rand::{Rng as _, RngCore};
 use secrecy::{ExposeSecret, SecretString};
 use sha1::Sha1;
 use sha2::Sha256;
 use uuid::Uuid;
 
-use crate::{
-    error::{self, Result},
-    model, rng,
-};
+use crate::{error::Result, rng};
+
+use super::{error as keepass_error, model};
 
 static PARAM_N: Lazy<BigInt> = Lazy::new(|| {
     BigInt::from_bytes_be(
@@ -125,12 +124,12 @@ impl Protocol<Init> {
 
         let my_evidence = Sha256::new_with_prefix(&my_public_key_str)
             .chain_update(&their_public_key_str)
-            .chain_update(&session_key_str.expose_secret())
+            .chain_update(session_key_str.expose_secret())
             .into();
 
         let their_evidence = Sha256::new_with_prefix(&my_public_key_str)
             .chain_update(String::from(&my_evidence))
-            .chain_update(&session_key_str.expose_secret())
+            .chain_update(session_key_str.expose_secret())
             .into();
 
         Protocol {
@@ -160,7 +159,7 @@ impl Protocol<Computed> {
         their_evidence: &model::hash::Hash,
     ) -> Result<Protocol<Authenticated>> {
         if &self.state.their_evidence != their_evidence {
-            return Err(error::Srp::ServerProofMismatch.into());
+            return Err(keepass_error::Srp::ServerProofMismatch.into());
         }
 
         let session_key_hash =

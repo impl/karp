@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2022 Noah Fontes
+# SPDX-FileCopyrightText: 2022-2024 Noah Fontes
 #
 # SPDX-License-Identifier: Apache-2.0
 
@@ -8,9 +8,15 @@
 
     allSystems = builtins.map (system: let
       pkgs = nixpkgs.legacyPackages.${system};
+
+      # https://github.com/NixOS/nixpkgs/issues/252838
+      lldb' = pkgs.lldb.overrideAttrs (_: {
+        outputs = [ "out" "dev" ] ++ optionals (!pkgs.stdenv.isDarwin) [ "lib" ];
+      });
     in rec {
       devShells.${system}.default = with pkgs; mkShell {
-        nativeBuildInputs = [ cargo clippy lldb rustc rustfmt ];
+        packages = [ cargo clippy lldb' rustc rustfmt ]
+          ++ optionals (pkgs.stdenv.hostPlatform.isDarwin) [ darwin.apple_sdk.frameworks.Security libiconv ];
       };
 
       packages.${system}.karp = with pkgs; rustPlatform.buildRustPackage {
@@ -20,11 +26,12 @@
         src = ./.;
         cargoLock = {
           lockFile = ./Cargo.lock;
-          outputHashes = {
-            "papergrid-0.4.0" = "sha256-p2cAUsURRK9HS6oj4hHmuxBpr4A7KcppmU2B5Iv5Mco=";
-            "tungstenite-0.17.2" = "sha256-kfzvN+4zNiiuTUVSQxZuWChU/rQuVhdhoxeqwd1Td+A=";
-          };
         };
+
+        buildInputs = optionals pkgs.stdenv.hostPlatform.isDarwin [ darwin.apple_sdk.frameworks.Security ];
+
+        buildFeatures = optionals pkgs.stdenv.hostPlatform.isLinux [ "secret-service" ]
+          ++ optionals pkgs.stdenv.hostPlatform.isDarwin [ "keychain" ];
 
         meta = {
           inherit (metadata.package) description;

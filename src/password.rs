@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2022 Noah Fontes
+// SPDX-FileCopyrightText: 2022-2024 Noah Fontes
 //
 // SPDX-License-Identifier: Apache-2.0
 
@@ -115,7 +115,7 @@ pub(crate) struct RpasswordPrompt;
 impl Prompt for RpasswordPrompt {
     async fn prompt(&self, req: Request) -> Result<Option<SecretString>> {
         if let Some(error) = req.error {
-            eprintln!("Error: {}", error);
+            eprintln!("Error: {error}");
         }
 
         Ok(Some(

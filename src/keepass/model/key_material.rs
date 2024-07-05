@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2022 Noah Fontes
+// SPDX-FileCopyrightText: 2022-2024 Noah Fontes
 //
 // SPDX-License-Identifier: Apache-2.0
 
@@ -16,7 +16,7 @@ use crate::error;
 /// unnecessary zeroes) and represented as an uppercase hex-encoded string.
 #[derive(Debug, Deserialize, Serialize, Clone, Eq)]
 #[serde(try_from = "String", into = "String")]
-pub(crate) struct KeyMaterial<const BYTES: usize>([u8; BYTES]);
+pub(in crate::keepass) struct KeyMaterial<const BYTES: usize>([u8; BYTES]);
 
 impl<const BYTES: usize> From<&KeyMaterial<BYTES>> for BigInt {
     fn from(value: &KeyMaterial<BYTES>) -> Self {
@@ -106,13 +106,13 @@ impl ExposeSecret<BigInt> for SecretBigInt {
     }
 }
 
-pub(crate) struct Secret<const BYTES: usize>(secrecy::Secret<KeyMaterial<BYTES>>);
+pub(in crate::keepass) struct Secret<const BYTES: usize>(secrecy::Secret<KeyMaterial<BYTES>>);
 
 impl<const BYTES: usize> Secret<BYTES>
 where
     [u8; BYTES]: rand::Fill,
 {
-    pub(crate) fn random<T: RngCore + ?Sized>(rng: &mut T) -> Self {
+    pub(in crate::keepass) fn random<T: RngCore + ?Sized>(rng: &mut T) -> Self {
         let mut data = [0; BYTES];
         rng.fill(&mut data);
         Self(secrecy::Secret::new(KeyMaterial(data)))

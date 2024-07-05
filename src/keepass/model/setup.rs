@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2022 Noah Fontes
+// SPDX-FileCopyrightText: 2022-2024 Noah Fontes
 //
 // SPDX-License-Identifier: Apache-2.0
 
@@ -8,13 +8,13 @@ use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use uuid::Uuid;
 
-use crate::{metadata, srp};
+use crate::metadata;
 
-use super::{hash::Hash, key_material::KeyMaterial};
+use super::{super::srp, hash::Hash, key_material::KeyMaterial};
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-pub(crate) enum ErrorCode {
+pub(in crate::keepass) enum ErrorCode {
     AuthFailed,
     AuthExpired,
     #[serde(other)]
@@ -29,17 +29,8 @@ pub(crate) struct Error {
 }
 
 impl Error {
-    #[cfg(any())]
-    pub(crate) fn code(&self) -> ErrorCode {
-        self.code
-    }
-
-    pub(crate) fn is_auth_error(&self) -> bool {
-        match self.code {
-            ErrorCode::AuthFailed => true,
-            ErrorCode::AuthExpired => true,
-            _ => false,
-        }
+    pub(in crate::keepass) fn is_auth_error(&self) -> bool {
+        matches!(self.code, ErrorCode::AuthFailed | ErrorCode::AuthExpired)
     }
 }
 
@@ -51,9 +42,9 @@ impl PartialEq<ErrorCode> for Error {
 
 impl Display for Error {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", self.code)?;
+        std::fmt::Debug::fmt(&self.code, f)?;
         for param in self.message_params.iter().flatten() {
-            write!(f, ": {}", param)?;
+            write!(f, ": {param}")?;
         }
         Ok(())
     }
@@ -61,7 +52,7 @@ impl Display for Error {
 
 #[derive(Debug, Deserialize, Serialize, PartialEq)]
 #[non_exhaustive]
-pub(crate) enum ClientFeature {
+pub(in crate::keepass) enum ClientFeature {
     #[serde(rename = "KPRPC_FEATURE_VERSION_1_6")]
     FeatureVersion1_6,
     #[serde(rename = "KPRPC_FEATURE_WARN_USER_WHEN_FEATURE_MISSING")]
@@ -72,7 +63,7 @@ pub(crate) enum ClientFeature {
 
 #[derive(Debug, Deserialize, Serialize, PartialEq)]
 #[non_exhaustive]
-pub(crate) enum ServerFeature {
+pub(in crate::keepass) enum ServerFeature {
     #[serde(rename = "KPRPC_FEATURE_VERSION_1_6")]
     FeatureVersion1_6,
     #[serde(rename = "KPRPC_GENERAL_CLIENTS")]
@@ -101,7 +92,7 @@ pub(crate) enum SecurityLevel {
 
 #[derive(Debug, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
-pub(crate) enum ClientInitVariant {
+pub(in crate::keepass) enum ClientInitVariant {
     Srp(SrpIdentifyToServer),
     #[serde(rename_all = "camelCase")]
     Key {
@@ -112,25 +103,25 @@ pub(crate) enum ClientInitVariant {
 
 #[derive(Debug, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct KeyServerChallenge {
+pub(in crate::keepass) struct KeyServerChallenge {
     #[serde(rename = "sc")]
     server_challenge: String,
     security_level: SecurityLevel,
 }
 
 impl KeyServerChallenge {
-    pub(crate) fn server_challenge(&self) -> &str {
+    pub(in crate::keepass) fn server_challenge(&self) -> &str {
         &self.server_challenge
     }
 
-    pub(crate) const fn security_level(&self) -> SecurityLevel {
+    pub(in crate::keepass) const fn security_level(&self) -> SecurityLevel {
         self.security_level
     }
 }
 
 #[derive(Debug, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct KeyClientNegotiation {
+pub(in crate::keepass) struct KeyClientNegotiation {
     #[serde(rename = "cc")]
     client_challenge: String,
     #[serde(rename = "cr")]
@@ -139,7 +130,7 @@ pub(crate) struct KeyClientNegotiation {
 }
 
 impl KeyClientNegotiation {
-    pub(crate) fn new(client_challenge: &str, client_response: &Hash) -> Self {
+    pub(in crate::keepass) fn new(client_challenge: &str, client_response: &Hash) -> Self {
         Self {
             client_challenge: client_challenge.to_owned(),
             client_response: client_response.clone(),
@@ -150,31 +141,31 @@ impl KeyClientNegotiation {
 
 #[derive(Debug, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct KeyServerResponse {
+pub(in crate::keepass) struct KeyServerResponse {
     #[serde(rename = "sr")]
     server_response: Hash,
     security_level: SecurityLevel,
 }
 
 impl KeyServerResponse {
-    pub(crate) const fn server_response(&self) -> &Hash {
+    pub(in crate::keepass) const fn server_response(&self) -> &Hash {
         &self.server_response
     }
 
-    pub(crate) const fn security_level(&self) -> SecurityLevel {
+    pub(in crate::keepass) const fn security_level(&self) -> SecurityLevel {
         self.security_level
     }
 }
 
 #[derive(Debug, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
-pub(crate) enum SrpIdentifyToServerStage {
+pub(in crate::keepass) enum SrpIdentifyToServerStage {
     IdentifyToServer,
 }
 
 #[derive(Debug, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct SrpIdentifyToServer {
+pub(in crate::keepass) struct SrpIdentifyToServer {
     stage: SrpIdentifyToServerStage,
     #[serde(rename = "I")]
     identifier: Uuid,
@@ -184,7 +175,10 @@ pub(crate) struct SrpIdentifyToServer {
 }
 
 impl SrpIdentifyToServer {
-    pub(crate) fn new(srp: &srp::Protocol<srp::Init>, security_level: SecurityLevel) -> Self {
+    pub(in crate::keepass) fn new(
+        srp: &srp::Protocol<srp::Init>,
+        security_level: SecurityLevel,
+    ) -> Self {
         Self {
             stage: SrpIdentifyToServerStage::IdentifyToServer,
             identifier: srp.identifier(),
@@ -196,13 +190,13 @@ impl SrpIdentifyToServer {
 
 #[derive(Debug, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
-pub(crate) enum SrpIdentifyToClientStage {
+pub(in crate::keepass) enum SrpIdentifyToClientStage {
     IdentifyToClient,
 }
 
 #[derive(Debug, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct SrpIdentifyToClient {
+pub(in crate::keepass) struct SrpIdentifyToClient {
     stage: SrpIdentifyToClientStage,
     #[serde(rename = "B")]
     public_key: KeyMaterial<84>,
@@ -212,28 +206,28 @@ pub(crate) struct SrpIdentifyToClient {
 }
 
 impl SrpIdentifyToClient {
-    pub(crate) const fn public_key(&self) -> &KeyMaterial<84> {
+    pub(in crate::keepass) const fn public_key(&self) -> &KeyMaterial<84> {
         &self.public_key
     }
 
-    pub(crate) fn salt(&self) -> &str {
+    pub(in crate::keepass) fn salt(&self) -> &str {
         &self.salt
     }
 
-    pub(crate) const fn security_level(&self) -> SecurityLevel {
+    pub(in crate::keepass) const fn security_level(&self) -> SecurityLevel {
         self.security_level
     }
 }
 
 #[derive(Debug, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
-pub(crate) enum SrpProofToServerStage {
+pub(in crate::keepass) enum SrpProofToServerStage {
     ProofToServer,
 }
 
 #[derive(Debug, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct SrpProofToServer {
+pub(in crate::keepass) struct SrpProofToServer {
     stage: SrpProofToServerStage,
     #[serde(rename = "M")]
     evidence: Hash,
@@ -241,7 +235,10 @@ pub(crate) struct SrpProofToServer {
 }
 
 impl SrpProofToServer {
-    pub(crate) fn new(srp: &srp::Protocol<srp::Computed>, security_level: SecurityLevel) -> Self {
+    pub(in crate::keepass) fn new(
+        srp: &srp::Protocol<srp::Computed>,
+        security_level: SecurityLevel,
+    ) -> Self {
         Self {
             stage: SrpProofToServerStage::ProofToServer,
             evidence: srp.my_evidence().clone(),
@@ -252,13 +249,13 @@ impl SrpProofToServer {
 
 #[derive(Debug, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
-pub(crate) enum SrpProofToClientStage {
+pub(in crate::keepass) enum SrpProofToClientStage {
     ProofToClient,
 }
 
 #[derive(Debug, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct SrpProofToClient {
+pub(in crate::keepass) struct SrpProofToClient {
     stage: SrpProofToClientStage,
     #[serde(rename = "M2")]
     evidence: Hash,
@@ -266,18 +263,18 @@ pub(crate) struct SrpProofToClient {
 }
 
 impl SrpProofToClient {
-    pub(crate) const fn evidence(&self) -> &Hash {
+    pub(in crate::keepass) const fn evidence(&self) -> &Hash {
         &self.evidence
     }
 
-    pub(crate) const fn security_level(&self) -> SecurityLevel {
+    pub(in crate::keepass) const fn security_level(&self) -> SecurityLevel {
         self.security_level
     }
 }
 
 #[derive(Debug, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct ClientInit {
+pub(in crate::keepass) struct ClientInit {
     features: Vec<ClientFeature>,
     client_type_id: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -289,7 +286,7 @@ pub(crate) struct ClientInit {
 }
 
 impl ClientInit {
-    pub(crate) fn new(variant: ClientInitVariant) -> Self {
+    pub(in crate::keepass) fn new(variant: ClientInitVariant) -> Self {
         Self {
             features: vec![
                 ClientFeature::FeatureVersion1_6,
@@ -305,7 +302,7 @@ impl ClientInit {
 
 #[derive(Debug, Deserialize, Serialize, PartialEq)]
 #[serde(untagged)]
-pub(crate) enum Variant {
+pub(in crate::keepass) enum Variant {
     #[serde(rename_all = "camelCase")]
     Error {
         error: Error,
@@ -341,14 +338,14 @@ pub(crate) struct Setup {
 }
 
 impl Setup {
-    pub(crate) const fn new(variant: Variant) -> Self {
+    pub(in crate::keepass) const fn new(variant: Variant) -> Self {
         Self {
             version: metadata::CLIENT_VERSION,
             variant,
         }
     }
 
-    pub(crate) const fn variant(&self) -> &Variant {
+    pub(in crate::keepass) const fn variant(&self) -> &Variant {
         &self.variant
     }
 }

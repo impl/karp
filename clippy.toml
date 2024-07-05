@@ -1,5 +1,6 @@
-# SPDX-FileCopyrightText: 2022 Noah Fontes
+# SPDX-FileCopyrightText: 2022-2024 Noah Fontes
 #
 # SPDX-License-Identifier: Apache-2.0
 
-doc-valid-idents = ["KeePass", "KeePassRPC", ".."]
+allowed-duplicate-crates = ["heck", "hermit-abi", "strsim", "syn", "windows-sys", "windows-targets", "windows_aarch64_gnullvm", "windows_aarch64_msvc", "windows_i686_gnu", "windows_i686_msvc", "windows_x86_64_gnu", "windows_x86_64_gnullvm", "windows_x86_64_msvc"]
+doc-valid-idents = ["KeePass", "KeePassRPC", "KeePassXC", "WebSocket", ".."]
