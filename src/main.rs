@@ -85,7 +85,7 @@ impl command::Command for Command {
 struct Args {
     /// The URL to connect to. For KeePassRPC, this is a WebSocket. For
     /// KeePassXC, this is a file path to a Unix domain socket.
-    #[arg(long, default_value = "ws://127.0.0.1:12546", value_parser = Url::parse)]
+    #[arg(long, env = "KARP_URL", default_value = "ws://127.0.0.1:12546", value_parser = Url::parse)]
     url: Url,
 
     /// Turn off caching of the shared key derived by connection negotiation.
