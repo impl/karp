@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2024 Noah Fontes
+// SPDX-FileCopyrightText: 2024-2026 Noah Fontes
 //
 // SPDX-License-Identifier: Apache-2.0
 
@@ -11,7 +11,7 @@ use serde_with::{base64::Base64, serde_as};
 
 use crate::error::Result;
 
-use super::{super::error as keepassxc_error, key_material, HasNonce};
+use super::{super::error as keepassxc_error, HasNonce, key_material};
 
 #[serde_as]
 #[derive(Deserialize, Serialize, PartialEq)]

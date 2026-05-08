@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2024 Noah Fontes
+// SPDX-FileCopyrightText: 2024-2026 Noah Fontes
 //
 // SPDX-License-Identifier: Apache-2.0
 
@@ -44,7 +44,9 @@ pub(crate) enum Api {
     UnhandledMessage(model::Message),
     #[error("server error: {}: {}", .0.name(), .0.message())]
     ServerError(model::jsonrpc::Error),
-    #[error("server security level is too low for us to accept and continue processing (wanted at least {0:?}, but got {1:?})")]
+    #[error(
+        "server security level is too low for us to accept and continue processing (wanted at least {0:?}, but got {1:?})"
+    )]
     SecurityLevelTooLow(model::setup::SecurityLevel, model::setup::SecurityLevel),
     #[error("encrypted message could not be authenticated")]
     MessageAuthenticationFailure,

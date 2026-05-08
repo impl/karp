@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2024 Noah Fontes
+// SPDX-FileCopyrightText: 2024-2026 Noah Fontes
 //
 // SPDX-License-Identifier: Apache-2.0
 
@@ -7,7 +7,7 @@ use log::debug;
 use secrecy::ExposeSecret as _;
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
-use serde_with::{base64::Base64, json::JsonString, serde_as, DisplayFromStr};
+use serde_with::{DisplayFromStr, base64::Base64, json::JsonString, serde_as};
 
 use rand::Rng as _;
 

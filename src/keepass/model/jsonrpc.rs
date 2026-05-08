@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2022-2024 Noah Fontes
+// SPDX-FileCopyrightText: 2022-2026 Noah Fontes
 //
 // SPDX-License-Identifier: Apache-2.0
 
@@ -28,7 +28,7 @@ impl Request {
     {
         rng::map(|rng| Self {
             id: Some(Id::String(
-                uuid::Builder::from_random_bytes(rng.gen())
+                uuid::Builder::from_random_bytes(rng.r#gen())
                     .into_uuid()
                     .to_string(),
             )),

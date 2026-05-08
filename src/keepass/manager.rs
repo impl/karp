@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2022-2024 Noah Fontes
+// SPDX-FileCopyrightText: 2022-2026 Noah Fontes
 //
 // SPDX-License-Identifier: Apache-2.0
 
@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 use async_recursion::async_recursion;
 use async_trait::async_trait;
-use futures_util::{lock::Mutex, stream, SinkExt, Stream, StreamExt};
+use futures_util::{SinkExt, Stream, StreamExt, lock::Mutex, stream};
 use log::warn;
 use num_bigint::RandBigInt;
 use secrecy::{ExposeSecret, SecretString};
@@ -242,15 +242,13 @@ async fn key_negotiate<
     message_stream: &mut MessageStream,
     their_challenge: &str,
 ) -> Result<BoundStorage<'storage, Storage>> {
+    let session_key = storage
+        .map_session_key(|session_key| SecretString::from(session_key))
+        .await?
+        .ok_or(error::Storage::Conflict)?;
     let my_challenge = rng::map(|rng| rng.gen_biguint(256).to_str_radix(16));
     let my_response = Sha256::new_with_prefix("1")
-        .chain_update({
-            storage
-                .map_session_key(|session_key| SecretString::from(session_key))
-                .await?
-                .ok_or(error::Storage::Conflict)?
-                .expose_secret()
-        })
+        .chain_update(session_key.expose_secret())
         .chain_update(their_challenge)
         .chain_update(&my_challenge)
         .into();
@@ -283,14 +281,12 @@ async fn key_negotiate<
             .into())
         }
         Some(model::setup::Variant::KeyServerResponse { key }) => {
+            let session_key = storage
+                .map_session_key(|session_key| SecretString::from(session_key))
+                .await?
+                .ok_or(error::Storage::Conflict)?;
             let their_response = Sha256::new_with_prefix("0")
-                .chain_update({
-                    storage
-                        .map_session_key(|session_key| SecretString::from(session_key))
-                        .await?
-                        .ok_or(error::Storage::Conflict)?
-                        .expose_secret()
-                })
+                .chain_update(session_key.expose_secret())
                 .chain_update(their_challenge)
                 .chain_update(&my_challenge)
                 .into();

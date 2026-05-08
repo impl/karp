@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2022-2024 Noah Fontes
+// SPDX-FileCopyrightText: 2022-2026 Noah Fontes
 //
 // SPDX-License-Identifier: Apache-2.0
 
@@ -24,12 +24,7 @@ impl SecretService {
     async fn item(&self) -> Result<Option<oo7::Item>> {
         Ok(self
             .keyring
-            .search_items(
-                self.attributes
-                    .iter()
-                    .map(|(key, value)| (key.as_str(), value.as_str()))
-                    .collect(),
-            )
+            .search_items(&self.attributes)
             .await
             .map_err(error::Storage::from)?
             .into_iter()
@@ -70,10 +65,7 @@ impl<T: for<'de> Deserialize<'de> + Send + Serialize + Sync> Storage<T> for Secr
         self.keyring
             .create_item(
                 &metadata::CLIENT_DISPLAY_NAME,
-                self.attributes
-                    .iter()
-                    .map(|(key, value)| (key.as_str(), value.as_str()))
-                    .collect(),
+                &self.attributes,
                 SecretVec::new(serde_json::to_vec(data)?).expose_secret(),
                 true,
             )

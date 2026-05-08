@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2022-2024 Noah Fontes
+// SPDX-FileCopyrightText: 2022-2026 Noah Fontes
 //
 // SPDX-License-Identifier: Apache-2.0
 
@@ -106,7 +106,9 @@ pub(crate) enum Conversion {
 
 #[derive(Error, Debug)]
 pub(crate) enum Storage {
-    #[error("client identifier in storage differs from identifier bound to stream (are you running multiple instances at the same time?)")]
+    #[error(
+        "client identifier in storage differs from identifier bound to stream (are you running multiple instances at the same time?)"
+    )]
     Conflict,
     #[cfg(feature = "keychain")]
     #[error("no OS-specific filesystem configuration found")]

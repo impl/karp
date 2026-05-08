@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2022-2024 Noah Fontes
+// SPDX-FileCopyrightText: 2022-2026 Noah Fontes
 //
 // SPDX-License-Identifier: Apache-2.0
 
@@ -7,8 +7,8 @@ use core::num;
 use async_trait::async_trait;
 use clap::Parser;
 use tabled::{
-    settings::{object::Segment, Alignment, Modify, Style},
     Table,
+    settings::{Alignment, Modify, Style, object::Segment},
 };
 
 use crate::{client::Client, error::Result};

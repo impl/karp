@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2024 Noah Fontes
+// SPDX-FileCopyrightText: 2024-2026 Noah Fontes
 //
 // SPDX-License-Identifier: Apache-2.0
 
@@ -10,9 +10,9 @@ use std::{
 };
 
 use futures_util::{
+    SinkExt as _, Stream, StreamExt as _,
     lock::Mutex,
     stream::{SplitSink, SplitStream},
-    SinkExt as _, Stream, StreamExt as _,
 };
 use log::{debug, info, warn};
 use secrecy::ExposeSecret;
@@ -91,10 +91,10 @@ pub(super) struct Manager<
 }
 
 impl<
-        Storage: storage::Storage<session::Data>,
-        MessageStream: message::Stream,
-        CallStream: Stream<Item = Call> + Send + Unpin,
-    > Manager<Storage, MessageStream, CallStream>
+    Storage: storage::Storage<session::Data>,
+    MessageStream: message::Stream,
+    CallStream: Stream<Item = Call> + Send + Unpin,
+> Manager<Storage, MessageStream, CallStream>
 {
     pub(super) async fn new(
         storage: Arc<Mutex<Storage>>,
@@ -301,7 +301,7 @@ impl<
                     return Ok(model::Key {
                         id: resp.id,
                         key: public_key,
-                    })
+                    });
                 }
                 Err(error::Error::Keepassxc(keepassxc_error::Error::Api(
                     keepassxc_error::Api::ServerError(err),

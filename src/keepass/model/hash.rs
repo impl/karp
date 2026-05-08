@@ -1,8 +1,8 @@
-// SPDX-FileCopyrightText: 2022-2024 Noah Fontes
+// SPDX-FileCopyrightText: 2022-2026 Noah Fontes
 //
 // SPDX-License-Identifier: Apache-2.0
 
-use generic_array::{typenum::U32, GenericArray};
+use generic_array::{GenericArray, typenum::U32};
 use num_bigint::{BigInt, BigUint};
 use num_traits::Num;
 use secrecy::ExposeSecret;

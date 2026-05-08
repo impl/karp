@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2022-2024 Noah Fontes
+// SPDX-FileCopyrightText: 2022-2026 Noah Fontes
 //
 // SPDX-License-Identifier: Apache-2.0
 
@@ -354,7 +354,7 @@ impl Setup {
 mod tests {
     use super::*;
     use rand::rngs::mock;
-    use serde_test::{assert_tokens, Configure, Token};
+    use serde_test::{Configure, Token, assert_tokens};
     use uuid::uuid;
 
     #[test]

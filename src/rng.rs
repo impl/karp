@@ -1,10 +1,10 @@
-// SPDX-FileCopyrightText: 2022-2024 Noah Fontes
+// SPDX-FileCopyrightText: 2022-2026 Noah Fontes
 //
 // SPDX-License-Identifier: Apache-2.0
 
 use std::cell::RefCell;
 
-use rand::{thread_rng, RngCore, SeedableRng};
+use rand::{RngCore, SeedableRng, thread_rng};
 use rand_chacha::ChaCha20Rng;
 
 thread_local! {

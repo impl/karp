@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2024 Noah Fontes
+// SPDX-FileCopyrightText: 2024-2026 Noah Fontes
 //
 // SPDX-License-Identifier: Apache-2.0
 
@@ -17,12 +17,11 @@ use futures_util::{future::BoxFuture, lock::Mutex};
 use tokio::{net::TcpStream, sync::mpsc};
 use tokio_stream::wrappers::ReceiverStream;
 use tokio_tungstenite::{
-    connect_async,
+    MaybeTlsStream, connect_async,
     tungstenite::{
         client::IntoClientRequest,
-        http::{header, HeaderValue},
+        http::{HeaderValue, header},
     },
-    MaybeTlsStream,
 };
 use url::Url;
 
@@ -137,10 +136,10 @@ impl<Storage: storage::Storage<session::Data>, Prompt: password::Prompt> Protoco
 
 #[async_trait]
 impl<
-        'channel,
-        Storage: storage::Storage<session::Data> + 'channel,
-        Prompt: password::Prompt + 'channel,
-    > client::Protocol<'channel> for Protocol<Storage, Prompt>
+    'channel,
+    Storage: storage::Storage<session::Data> + 'channel,
+    Prompt: password::Prompt + 'channel,
+> client::Protocol<'channel> for Protocol<Storage, Prompt>
 {
     async fn channel(
         &self,

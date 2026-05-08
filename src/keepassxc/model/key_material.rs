@@ -1,9 +1,9 @@
-// SPDX-FileCopyrightText: 2024 Noah Fontes
+// SPDX-FileCopyrightText: 2024-2026 Noah Fontes
 //
 // SPDX-License-Identifier: Apache-2.0
 
-use crypto_box::{aead::AeadCore, SalsaBox};
-pub(in crate::keepassxc) use crypto_box::{Nonce, PublicKey, KEY_SIZE};
+pub(in crate::keepassxc) use crypto_box::{KEY_SIZE, Nonce, PublicKey};
+use crypto_box::{SalsaBox, aead::AeadCore};
 use digest::typenum::Unsigned;
 use secrecy::ExposeSecret;
 use serde::{Deserialize, Serialize};

@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2022-2024 Noah Fontes
+// SPDX-FileCopyrightText: 2022-2026 Noah Fontes
 //
 // SPDX-License-Identifier: Apache-2.0
 
@@ -111,7 +111,10 @@ async fn get_session_storage<
         match storage::SecretService::new(&args.url).await {
             Ok(secret_service_storage) => return Box::new(secret_service_storage),
             Err(e) => {
-                warn!("We need to fall back to unencrypted file storage because we can't connect to the secret service: {}", e);
+                warn!(
+                    "We need to fall back to unencrypted file storage because we can't connect to the secret service: {}",
+                    e
+                );
             }
         }
 
@@ -119,7 +122,10 @@ async fn get_session_storage<
         match storage::Keychain::new(&args.url) {
             Ok(keychain_storage) => return Box::new(keychain_storage),
             Err(e) => {
-                warn!("We need to fall back to unencrypted file storage because we can't connect to Keychain: {}", e);
+                warn!(
+                    "We need to fall back to unencrypted file storage because we can't connect to Keychain: {}",
+                    e
+                );
             }
         }
 

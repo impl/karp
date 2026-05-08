@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2022-2024 Noah Fontes
+// SPDX-FileCopyrightText: 2022-2026 Noah Fontes
 //
 // SPDX-License-Identifier: Apache-2.0
 
@@ -7,8 +7,8 @@ use clap::Parser;
 use log::error;
 use secrecy::ExposeSecret;
 use tabled::{
-    settings::{object::Cell, Format, Modify, Style},
     Table,
+    settings::{Format, Modify, Style, object::Cell},
 };
 
 use crate::{
@@ -52,12 +52,15 @@ impl super::Command for Command {
         });
 
         if let Some(n) = self.index {
-            if let Some(field) = fields_iter.nth(n) {
-                println!("{}", field.value.expose_secret());
-                Ok(())
-            } else {
-                error!("No form field with index {}", n);
-                Err(error::Error::Command)
+            match fields_iter.nth(n) {
+                Some(field) => {
+                    println!("{}", field.value.expose_secret());
+                    Ok(())
+                }
+                _ => {
+                    error!("No form field with index {}", n);
+                    Err(error::Error::Command)
+                }
             }
         } else {
             println!(
